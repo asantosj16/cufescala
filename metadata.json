@@ -1,0 +1,5 @@
+{
+  "name": "Escala CUF Trindade 2026",
+  "description": "Sistema de gestão de escala de serviço para a CUF Trindade, com rotações automáticas de turnos (M56, T6) e folgas (DS1, DS2, DS3) para Cláudia, Irene e Licínia, permitindo ajustes manuais e visualização mensal.",
+  "requestFramePermissions": []
+}
