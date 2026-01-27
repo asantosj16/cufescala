@@ -151,13 +151,17 @@ const App: React.FC = () => {
       return acc + h;
     }, 0);
 
-  const calculateTargetHours = (staff: StaffName): number => monthDays.reduce((acc, day) => {
-    const dateStr = format(day, 'yyyy-MM-dd');
-    if (holidays.includes(dateStr)) return acc;
-    const dIdx = getDay(day);
-    if (staff === 'Licínia') return [5,6,0,1].includes(dIdx) ? acc + 5 : acc;
-    return [1,2,3,4,5].includes(dIdx) ? acc + 8 : acc;
-  }, 0);
+  const calculateTargetHours = (staff: StaffName): number => {
+    return monthShifts.filter(s => s.staffId === staff).reduce((acc, curr) => {
+      if (holidays.includes(curr.date) || curr.shift === ShiftType.FP) {
+        return acc;
+      }
+      if (curr.shift === ShiftType.DS || curr.shift === ShiftType.F) {
+        return acc;
+      }
+      return acc + (SHIFT_DETAILS[curr.shift]?.hours || 0);
+    }, 0);
+  };
 
   const exportCSV = () => {
     const csvRows = [["Funcionária", "Data", "Tipo de Turno/Ausência", "Horas"]];
