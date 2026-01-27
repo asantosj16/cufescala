@@ -38,6 +38,7 @@ import { ShiftType, StaffName, CustomOverrides, RotationType, StaffConfig, OffDa
 import { STAFF_LIST, SHIFT_DETAILS } from './constants';
 import { generateSchedule } from './services/schedulerEngine';
 import { ShiftBadge } from './components/ShiftBadge';
+import { storage } from './services/storageService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
   'Cláudia': { rotation: RotationType.ALTERNATING, offDayGroup: 'DS1', startShift: ShiftType.T6 },
@@ -85,11 +86,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     setSaveStatus('saving');
-    localStorage.setItem('cuf-overrides-v3', JSON.stringify(overrides));
-    localStorage.setItem('cuf-holidays-v3', JSON.stringify(holidays));
-    localStorage.setItem('cuf-roster-configs', JSON.stringify(configs));
-    const timer = setTimeout(() => setSaveStatus('saved'), 500);
-    return () => clearTimeout(timer);
+    const timeout = setTimeout(() => {
+      Promise.all([
+        storage.saveData('cuf-overrides-v3', overrides),
+        storage.saveData('cuf-holidays-v3', holidays),
+        storage.saveData('cuf-roster-configs', configs),
+      ]).then(() => {
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }).catch(err => {
+        console.error('Erro ao salvar dados:', err);
+        setSaveStatus('idle');
+      });
+    }, 300); // Debounce de 300ms para evitar salvar a cada mudança
+    
+    return () => clearTimeout(timeout);
   }, [overrides, holidays, configs]);
 
   const year = currentDate.getFullYear();
@@ -178,6 +189,20 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
+  const exportJSON = async () => {
+    try {
+      const jsonData = await storage.exportAllData();
+      const link = document.createElement("a");
+      link.setAttribute("href", `data:application/json;charset=utf-8,${encodeURIComponent(jsonData)}`);
+      link.setAttribute("download", `escala-cuf-backup-${format(new Date(), 'yyyy-MM-dd-HHmmss')}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('Erro ao exportar dados JSON.');
+    }
+  };
+
   const resetRotation = () => {
     if (window.confirm('Reativar rotação automática para este mês? Isto removerá os ajustes manuais de TODAS as funcionárias em ' + format(currentDate, 'MMMM', { locale: pt }) + '.')) {
       const newOverrides = { ...overrides };
@@ -206,12 +231,20 @@ const App: React.FC = () => {
     }
   };
 
-  const manualSave = () => {
+  const manualSave = async () => {
     setSaveStatus('saving');
-    localStorage.setItem('cuf-overrides-v3', JSON.stringify(overrides));
-    localStorage.setItem('cuf-holidays-v3', JSON.stringify(holidays));
-    localStorage.setItem('cuf-roster-configs', JSON.stringify(configs));
-    setTimeout(() => setSaveStatus('saved'), 500);
+    try {
+      await Promise.all([
+        storage.saveData('cuf-overrides-v3', overrides),
+        storage.saveData('cuf-holidays-v3', holidays),
+        storage.saveData('cuf-roster-configs', configs),
+      ]);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (err) {
+      console.error('Erro ao salvar dados:', err);
+      setSaveStatus('idle');
+    }
   };
 
   const clearAllOverrides = () => {
@@ -229,8 +262,17 @@ const App: React.FC = () => {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black tracking-tight truncate">Escala CUF Trindade</h1>
+                {saveStatus === 'saving' && (
+                  <span className="hidden sm:inline-flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight">
+                    <span className="inline-block w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                    Sincronizando...
+                  </span>
+                )}
                 {saveStatus === 'saved' && (
-                  <span className="hidden sm:inline-block bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight">Salvo</span>
+                  <span className="hidden sm:inline-flex items-center gap-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-tight">
+                    <span className="inline-block w-2 h-2 bg-emerald-600 rounded-full"></span>
+                    Salvo
+                  </span>
                 )}
               </div>
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate">Gestão Operacional • 2026</p>
@@ -301,19 +343,33 @@ const App: React.FC = () => {
             <button onClick={exportCSV} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
               <FileSpreadsheet size={12} /> CSV
             </button>
+            <button onClick={exportJSON} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
+              <Database size={12} /> BACKUP JSON
+            </button>
             <button onClick={() => fileInputRef.current?.click()} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border ${darkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
               <Upload size={12} /> RESTAURAR JSON
             </button>
-            <input type="file" ref={fileInputRef} onChange={(e) => {
+            <input type="file" ref={fileInputRef} onChange={async (e) => {
                const file = e.target.files?.[0];
                if (file) {
                  const reader = new FileReader();
-                 reader.onload = (ev) => {
+                 reader.onload = async (ev) => {
                    try {
                      const data = JSON.parse(ev.target?.result as string);
-                     if (data.overrides) setOverrides(data.overrides);
-                     if (data.holidays) setHolidays(data.holidays);
-                     if (data.configs) setConfigs(data.configs);
+                     if (data.overrides) {
+                       setOverrides(data.overrides);
+                       await storage.saveData('cuf-overrides-v3', data.overrides);
+                     }
+                     if (data.holidays) {
+                       setHolidays(data.holidays);
+                       await storage.saveData('cuf-holidays-v3', data.holidays);
+                     }
+                     if (data.configs) {
+                       setConfigs(data.configs);
+                       await storage.saveData('cuf-roster-configs', data.configs);
+                     }
+                     setSaveStatus('saved');
+                     setTimeout(() => setSaveStatus('idle'), 2000);
                      alert('Dados restaurados com sucesso!');
                    } catch (err) {
                      alert('Erro ao carregar ficheiro JSON.');
