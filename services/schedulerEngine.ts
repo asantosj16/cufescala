@@ -96,6 +96,59 @@ export const generateSchedule = (
   const claudiaWeeklyOffs = generateClaudiaRandomOffs(year, month);
   const ireneWeeklyOffs = generateIreneRandomOffs(year, month);
 
+  // Primeiro passo: gera shifts para Cláudia e Irene para identificar quando ambas trabalham juntas
+  const claudiaShifts: Record<string, ShiftType> = {};
+  const ireneShifts: Record<string, ShiftType> = {};
+
+  days.forEach((day) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    const isoWeek = getISOWeek(day);
+    const dayOfWeek = getDay(day);
+
+    // Calcula shifts de Cláudia
+    const claudiaConfig = configs['Cláudia'];
+    if (!overrides[`Cláudia-${dateStr}`]) {
+      let claudiaOffDays: number[] = [];
+      if (claudiaWeeklyOffs[isoWeek]) {
+        claudiaOffDays = claudiaWeeklyOffs[isoWeek];
+      }
+      
+      if (claudiaOffDays.includes(dayOfWeek)) {
+        claudiaShifts[dateStr] = ShiftType.DS;
+      } else {
+        const weekDiff = isoWeek - refWeek;
+        const isReferenceParity = Math.abs(weekDiff) % 2 === 0;
+        claudiaShifts[dateStr] = isReferenceParity ? claudiaConfig.startShift : 
+          (claudiaConfig.startShift === ShiftType.M56 ? ShiftType.T6 : ShiftType.M56);
+      }
+    } else {
+      claudiaShifts[dateStr] = overrides[`Cláudia-${dateStr}`];
+    }
+
+    // Calcula shifts de Irene
+    const ireneConfig = configs['Irene'];
+    if (!overrides[`Irene-${dateStr}`]) {
+      let ireneOffDays: number[] = [];
+      if (ireneWeeklyOffs[isoWeek]) {
+        ireneOffDays = ireneWeeklyOffs[isoWeek];
+      } else {
+        ireneOffDays = DS_GROUPS[ireneConfig.offDayGroup] || [];
+      }
+      
+      if (ireneOffDays.includes(dayOfWeek)) {
+        ireneShifts[dateStr] = ShiftType.DS;
+      } else {
+        const weekDiff = isoWeek - refWeek;
+        const isReferenceParity = Math.abs(weekDiff) % 2 === 0;
+        ireneShifts[dateStr] = isReferenceParity ? ireneConfig.startShift : 
+          (ireneConfig.startShift === ShiftType.M56 ? ShiftType.T6 : ShiftType.M56);
+      }
+    } else {
+      ireneShifts[dateStr] = overrides[`Irene-${dateStr}`];
+    }
+  });
+
+  // Segundo passo: gera shifts para todos
   days.forEach((day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
     const isoWeek = getISOWeek(day);
@@ -156,8 +209,21 @@ export const generateSchedule = (
           shift = ShiftType.T6;
           break;
         case RotationType.WEEKEND_COVER:
-          // Lógica específica Licínia: Sex a Seg
-          if ([5, 6, 0, 1].includes(dayOfWeek)) {
+          // Lógica específica Licínia: sexta a segunda
+          // Se é sábado ou domingo e ambas Cláudia e Irene estão trabalhando, Licínia tem folga
+          if ([6, 0].includes(dayOfWeek)) {
+            const claudiaWorking = claudiaShifts[dateStr] && claudiaShifts[dateStr] !== ShiftType.DS;
+            const ireneWorking = ireneShifts[dateStr] && ireneShifts[dateStr] !== ShiftType.DS;
+            
+            if (claudiaWorking && ireneWorking) {
+              shift = ShiftType.DS;
+            } else if ([5, 6, 0, 1].includes(dayOfWeek)) {
+              shift = (isoWeek % 2 === 0) ? ShiftType.S178 : ShiftType.T94;
+            } else {
+              shift = ShiftType.DS;
+            }
+          } else if ([5, 1].includes(dayOfWeek)) {
+            // Sexta e Segunda: segue o padrão normal
             shift = (isoWeek % 2 === 0) ? ShiftType.S178 : ShiftType.T94;
           } else {
             shift = ShiftType.DS;
