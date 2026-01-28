@@ -103,6 +103,7 @@ const App: React.FC = () => {
         storage.saveData('cuf-holidays-v3', holidays),
         storage.saveData('cuf-roster-configs', configs),
       ]).then(() => {
+        console.log('💾 Dados salvos, publicando sincronização...');
         // Publica a sincronização para outros dispositivos
         syncService.publishSync({
           overrides,
@@ -125,18 +126,30 @@ const App: React.FC = () => {
 
   // Escuta atualizações de sincronização de outros dispositivos
   useEffect(() => {
+    console.log('🔄 Registrando listener de sincronização');
     const unsubscribe = syncService.onSync((syncData) => {
-      if (syncData.overrides) setOverrides(prev => ({ ...prev, ...syncData.overrides }));
-      if (syncData.holidays) setHolidays(prev => [...new Set([...prev, ...syncData.holidays])]);
-      if (syncData.configs) setConfigs(prev => ({ ...prev, ...syncData.configs }));
-      if (syncData.theme) setDarkMode(syncData.theme === 'dark');
+      console.log('📱 Sincronização recebida:', syncData);
+      if (syncData.overrides) {
+        console.log('📝 Atualizando overrides');
+        setOverrides(prev => ({ ...prev, ...syncData.overrides }));
+      }
+      if (syncData.holidays) {
+        console.log('🏖️ Atualizando holidays');
+        setHolidays(prev => [...new Set([...prev, ...syncData.holidays])]);
+      }
+      if (syncData.configs) {
+        console.log('⚙️ Atualizando configs');
+        setConfigs(prev => ({ ...prev, ...syncData.configs }));
+      }
+      if (syncData.theme) {
+        console.log('🌙 Atualizando theme');
+        setDarkMode(syncData.theme === 'dark');
+      }
     });
-    return () => unsubscribe();
-  }, []);
-
-  // Inicia o polling de sincronização quando o componente monta
-  useEffect(() => {
-    syncService.startPolling();
+    return () => {
+      console.log('🛑 Removendo listener de sincronização');
+      unsubscribe();
+    };
   }, []);
 
   const year = currentDate.getFullYear();

@@ -2,6 +2,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { syncService } from './services/syncService';
+
+// Expõe syncService globalmente para debug
+(window as any).syncService = syncService;
+console.log('🔄 SyncService disponível em window.syncService para debug');
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
