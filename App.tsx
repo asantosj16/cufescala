@@ -42,6 +42,7 @@ import { InfoSchedule } from './components/InfoSchedule';
 import { AlertsLegend } from './components/AlertsLegend';
 import { WeeklyAlertsPanel } from './components/WeeklyAlertsPanel';
 import { storage } from './services/storageService';
+import { syncService } from './services/syncService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
   'Cláudia': { rotation: RotationType.ALTERNATING, offDayGroup: 'DS1', startShift: ShiftType.T6 },
@@ -112,6 +113,51 @@ const App: React.FC = () => {
     
     return () => clearTimeout(timeout);
   }, [overrides, holidays, configs]);
+
+  // Listener para sincronização de dados entre dispositivos
+  useEffect(() => {
+    const unsubscribe = syncService.onSync((syncData) => {
+      console.log('Sincronização recebida:', syncData);
+
+      // Atualiza overrides se recebeu mudança
+      if (syncData.overrides !== undefined) {
+        setOverrides(prev => {
+          const merged = { ...prev, ...syncData.overrides };
+          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
+        });
+      }
+
+      // Atualiza holidays se recebeu mudança
+      if (syncData.holidays !== undefined) {
+        setHolidays(prev => {
+          const merged = [...new Set([...prev, ...syncData.holidays!])];
+          merged.sort();
+          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
+        });
+      }
+
+      // Atualiza configs se recebeu mudança
+      if (syncData.configs !== undefined) {
+        setConfigs(prev => {
+          const merged = { ...prev, ...syncData.configs };
+          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
+        });
+      }
+
+      // Atualiza tema se recebeu mudança
+      if (syncData.theme !== undefined) {
+        const isDark = syncData.theme === 'dark';
+        if (isDark !== darkMode) {
+          setDarkMode(isDark);
+        }
+      }
+    });
+
+    // Cleanup ao desmontar
+    return () => {
+      unsubscribe();
+    };
+  }, [darkMode]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();

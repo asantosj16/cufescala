@@ -46,6 +46,76 @@ Clique no botão **SALVAR** no painel de controle para forçar uma sincronizaç�
 - **REATIVAR ROTAÇÃO (MÊS)**: Remove apenas ajustes manuais do mês atual
 - **REATIVAR TUDO**: Remove **todos** os ajustes manuais de **todos os meses**
 
+## Sincronização Entre Dispositivos 🔄
+
+O aplicativo agora **sincroniza automaticamente todas as mudanças entre dispositivos** (telemóvel, tablet, computador, etc.).
+
+### Como Funciona
+
+#### 1. **Sincronização Automática**
+Quando você faz uma alteração em um dispositivo:
+- A alteração é salva localmente no dispositivo
+- É transmitida automaticamente para **TODOS os outros dispositivos** conectados
+- Outros dispositivos atualizam a interface em tempo real
+
+#### 2. **Mecanismos de Sincronização**
+O sistema utiliza múltiplos mecanismos para garantir sincronização confiável:
+
+- **BroadcastChannel API**: Sincroniza entre abas/contextos do navegador (instantâneo)
+- **Storage Events**: Sincroniza entre janelas/abas (transmissão automática)
+- **Polling Automático**: Verifica mudanças a cada 5 segundos (fallback)
+
+#### 3. **Identificação de Dispositivo**
+- Cada dispositivo recebe um **ID único** (`cuf-device-id`)
+- O ID é armazenado localmente e nunca compartilhado
+- Permite identificar qual dispositivo fez a alteração
+
+### Exemplos de Sincronização
+
+**Cenário 1: Mudança de Turno**
+```
+Dispositivo A (Telemóvel)
+  → Usuário altera turno de "Cláudia" em 15/02/2026
+  → Dados salvos e sincronizados
+  
+Dispositivo B (Tablet) e C (Computador)
+  → Ambos recebem a mudança automaticamente
+  → Interface atualiza em tempo real
+```
+
+**Cenário 2: Adicionar Feriado**
+```
+Dispositivo A (Computador)
+  → Usuário marca "25/12/2026" como feriado
+  → Alteração é salva
+  
+Dispositivo B (Telemóvel)
+  → Em menos de 5 segundos, a data aparece como feriado
+  → Escala é regenerada automaticamente
+```
+
+### Dados Sincronizados
+
+Os seguintes dados são sincronizados **em tempo real**:
+- ✅ **Turnos manuais** (overrides)
+- ✅ **Feriados públicos**
+- ✅ **Configurações da equipa**
+- ✅ **Preferência de tema**
+
+### Limitações e Considerações
+
+⚠️ **Sincronização Local**: A sincronização funciona apenas entre dispositivos no **mesmo navegador/origin**
+  - Exemplos: `localhost:5173`, `seu-dominio.com`, `seu-dominio.pt`
+  - Não sincroniza entre navegadores diferentes (Chrome vs Firefox)
+
+⚠️ **Offline**: Se um dispositivo estiver offline
+  - As alterações são salvas localmente
+  - Serão sincronizadas automaticamente quando voltar online
+
+⚠️ **Conflitos**: Alterações simultâneas são resolvidas por **timestamp**
+  - A mudança mais recente sempre prevalece
+  - Sistema de merge automático para minimizar perda de dados
+
 ### Dados Exportados
 
 O arquivo JSON contém:
@@ -62,11 +132,14 @@ O arquivo JSON contém:
 ### Informações Técnicas
 
 **Serviço de Persistência**: `services/storageService.ts`
+**Serviço de Sincronização**: `services/syncService.ts`
 
 ```typescript
 // Usar em componentes
 import { storage } from './services/storageService';
+import { syncService } from './services/syncService';
 
+// === STORAGE ===
 // Salvar dados
 await storage.saveData('chave', dados);
 
@@ -81,6 +154,22 @@ await storage.importData(jsonString);
 
 // Limpar dados
 await storage.clearData('chave');
+
+// === SYNC ===
+// Registrar listener para sincronização
+const unsubscribe = syncService.onSync((syncData) => {
+  console.log('Dados sincronizados:', syncData);
+  // Atualizar estado aqui
+});
+
+// Limpar listener
+unsubscribe();
+
+// Forçar sincronização manual
+syncService.forceSync();
+
+// Obter ID do dispositivo
+const deviceId = syncService.getDeviceId();
 ```
 
 ### Garantias
@@ -90,8 +179,10 @@ await storage.clearData('chave');
 ✅ **Backup automático** via IndexedDB  
 ✅ **Recuperação automática** ao recarregar página  
 ✅ **Exportação manual** para backup seguro  
+✅ **Sincronização entre dispositivos** em tempo real  
+✅ **Polling automático** a cada 5 segundos para garantir sincronização  
 
 ---
 
-**Versão**: 1.0  
+**Versão**: 2.0  
 **Última atualização**: Janeiro 2026
