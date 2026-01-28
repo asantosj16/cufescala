@@ -31,6 +31,7 @@ import {
   FileSpreadsheet,
   Clock,
   TrendingUp,
+  TrendingDown,
   UserCheck
 } from 'lucide-react';
 
@@ -421,11 +422,15 @@ const App: React.FC = () => {
                     (darkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500')
                   } print:bg-white print:border-slate-400 print:text-slate-900`}>
                     <div className="flex items-center gap-1 mb-0.5">
-                      <TrendingUp size={8} className="opacity-60 md:w-[10px] md:h-[10px]" />
+                      {isPos ? (
+                        <TrendingUp size={8} className="opacity-60 md:w-[10px] md:h-[10px]" />
+                      ) : isNeg ? (
+                        <TrendingDown size={8} className="opacity-60 md:w-[10px] md:h-[10px]" />
+                      ) : null}
                       <p className="text-[7px] md:text-[9px] font-black uppercase tracking-widest opacity-80">Saldo</p>
                     </div>
                     <p className="font-black text-sm md:text-lg tabular-nums">
-                      {isPos ? `+${balance}` : balance}h
+                      {isPos ? `+${balance}h` : isNeg ? `${balance}h` : `${balance}h`}
                     </p>
                   </div>
                 </div>
