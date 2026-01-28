@@ -17,7 +17,8 @@ const CLAUDIA_RANDOM_OFFS = [
 ];
 
 // Gera folgas aleatórias para Cláudia no mês
-const generateClaudiaRandomOffs = (year: number, month: number): number[][] => {
+// Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
+const generateClaudiaRandomOffs = (year: number, month: number): Record<number, number[]> => {
   // Seed determinístico baseado no mês/ano para consistência
   const seed = year * 12 + month;
   
@@ -41,12 +42,13 @@ const generateClaudiaRandomOffs = (year: number, month: number): number[][] => {
   }
   
   // Aloca os 3 tipos de folga para as primeiras 3 semanas disponíveis
+  // Cada semana tem exatamente UM padrão de folga
   const weekOffMap: Record<number, number[]> = {};
   for (let i = 0; i < Math.min(3, shuffled.length); i++) {
     weekOffMap[shuffled[i]] = CLAUDIA_RANDOM_OFFS[i];
   }
   
-  return Object.values(weekOffMap);
+  return weekOffMap;
 };
 
 export const generateSchedule = (
@@ -63,8 +65,8 @@ export const generateSchedule = (
   // Semana de referência fixa (Semana 10 de 2026 como base de rotação conforme pedido original)
   const refWeek = 10;
   
-  // Gera as folgas aleatórias para Cláudia
-  const claudiaRandomOffs = generateClaudiaRandomOffs(year, month);
+  // Gera o mapa de folgas aleatórias para Cláudia: semana ISO -> padrão de folga
+  const claudiaWeeklyOffs = generateClaudiaRandomOffs(year, month);
 
   days.forEach((day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -80,16 +82,17 @@ export const generateSchedule = (
         return;
       }
 
-      let offDays = DS_GROUPS[config.offDayGroup] || [];
+      let offDays: number[] = [];
       
-      // Para Cláudia, aplica folgas aleatórias ao invés da configuração padrão
       if (staff === 'Cláudia') {
-        offDays = [];
-        claudiaRandomOffs.forEach(offPair => {
-          if (offPair.includes(dayOfWeek)) {
-            offDays.push(dayOfWeek);
-          }
-        });
+        // Para Cláudia, verifica se a semana ISO tem um padrão de folga
+        // e se o dia atual pertence a esse padrão
+        if (claudiaWeeklyOffs[isoWeek]) {
+          offDays = claudiaWeeklyOffs[isoWeek];
+        }
+      } else {
+        // Para outros, usa a configuração padrão
+        offDays = DS_GROUPS[config.offDayGroup] || [];
       }
 
       const isOffDay = offDays.includes(dayOfWeek);
