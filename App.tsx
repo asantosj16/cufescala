@@ -207,12 +207,57 @@ const App: React.FC = () => {
     return actual - target;
   };
 
+  const calculateYearlyActualHours = (staff: StaffName): number => {
+    let totalHours = 0;
+    // Calcula horas reais trabalhadas de janeiro a dezembro
+    for (let m = 0; m < 12; m++) {
+      const baseShifts = generateSchedule(year, m, overrides, configs);
+      const monthlyShifts = baseShifts.map(s => {
+        const dateStr = s.date;
+        if (holidays.includes(dateStr)) return { ...s, shift: ShiftType.FP };
+        return s;
+      });
+      
+      totalHours += monthlyShifts
+        .filter(s => s.staffId === staff)
+        .filter(s => s.shift !== ShiftType.F && s.shift !== ShiftType.FP && s.shift !== ShiftType.DS)
+        .reduce((acc, curr) => acc + (SHIFT_DETAILS[curr.shift]?.hours || 0), 0);
+    }
+    return totalHours;
+  };
+
+  const calculateYearlyTargetHours = (staff: StaffName): number => {
+    let totalHours = 0;
+    // Calcula horas esperadas de janeiro a dezembro
+    for (let m = 0; m < 12; m++) {
+      const monthStart = new Date(year, m, 1);
+      const monthEnd = endOfMonth(monthStart);
+      const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+      
+      let workDays = 0;
+      days.forEach(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const dayOfWeek = getDay(day);
+        if (![0, 6].includes(dayOfWeek) && !holidays.includes(dateStr)) {
+          workDays++;
+        }
+      });
+      
+      if (staff === 'Licínia') {
+        totalHours += Math.round((workDays / 5) * 20);
+      } else {
+        totalHours += workDays * 8;
+      }
+    }
+    return totalHours;
+  };
+
   const getStaffBalance = () => {
     return STAFF_LIST.map(staff => ({
       name: staff,
-      actual: calculateActualHours(staff),
-      target: calculateTargetHours(staff),
-      balance: calculateYearlyBalance(staff),
+      actual: calculateYearlyActualHours(staff),
+      target: calculateYearlyTargetHours(staff),
+      balance: calculateYearlyActualHours(staff) - calculateYearlyTargetHours(staff),
     }));
   };
 
