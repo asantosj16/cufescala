@@ -201,6 +201,21 @@ const App: React.FC = () => {
     return targetHours;
   };
 
+  const calculateYearlyBalance = (staff: StaffName) => {
+    const actual = calculateActualHours(staff);
+    const target = calculateTargetHours(staff);
+    return actual - target;
+  };
+
+  const getStaffBalance = () => {
+    return STAFF_LIST.map(staff => ({
+      name: staff,
+      actual: calculateActualHours(staff),
+      target: calculateTargetHours(staff),
+      balance: calculateYearlyBalance(staff),
+    }));
+  };
+
   const exportCSV = () => {
     const csvRows = [["Funcionária", "Data", "Tipo de Turno/Ausência", "Horas"]];
     monthShifts.forEach(s => {
@@ -409,7 +424,7 @@ const App: React.FC = () => {
         </section>
 
         {/* Informações de Funcionárias, Horários e Folgas */}
-        <InfoSchedule darkMode={darkMode} />
+        <InfoSchedule darkMode={darkMode} staffBalance={getStaffBalance()} />
 
         {/* Legenda de Turnos e Horários Semanais */}
         <AlertsLegend darkMode={darkMode} />
