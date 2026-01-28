@@ -11,16 +11,23 @@ const DS_GROUPS = {
 
 // Folgas aleatórias para Cláudia: (Sexta+Sábado), (Sábado+Domingo), (Domingo+Segunda)
 const CLAUDIA_RANDOM_OFFS = [
-  [5, 6], // Sexta + Sábado
-  [6, 0], // Sábado + Domingo
-  [0, 1], // Domingo + Segunda
+  [5, 6], // Semana 1: Sexta + Sábado
+  [6, 0], // Semana 2: Sábado + Domingo
+  [0, 1], // Semana 3: Domingo + Segunda
 ];
 
-// Gera folgas aleatórias para Cláudia no mês
+// Folgas aleatórias para Irene: (Sábado+Domingo), (Sexta+Sábado), (Domingo+Segunda)
+const IRENE_RANDOM_OFFS = [
+  [6, 0], // Semana 1: Sábado + Domingo
+  [5, 6], // Semana 2: Sexta + Sábado
+  [0, 1], // Semana 3: Domingo + Segunda
+];
+
+// Função genérica para gerar folgas aleatórias
 // Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
 // Garante que SEMPRE haja as 3 folgas em cada mês (2 dias consecutivos cada)
 // com 4 semanas selecionadas do mês
-const generateClaudiaRandomOffs = (year: number, month: number): Record<number, number[]> => {
+const generateRandomOffs = (year: number, month: number, staffOffsPattern: number[][]): Record<number, number[]> => {
   // Seed determinístico baseado no mês/ano para consistência
   const seed = year * 12 + month;
   
@@ -49,10 +56,20 @@ const generateClaudiaRandomOffs = (year: number, month: number): Record<number, 
   // Cada semana com folga tem exatamente UM padrão de folga (2 dias consecutivos)
   const weekOffMap: Record<number, number[]> = {};
   for (let i = 0; i < 3 && i < shuffled.length; i++) {
-    weekOffMap[shuffled[i]] = CLAUDIA_RANDOM_OFFS[i];
+    weekOffMap[shuffled[i]] = staffOffsPattern[i];
   }
   
   return weekOffMap;
+};
+
+// Gera folgas aleatórias para Cláudia
+const generateClaudiaRandomOffs = (year: number, month: number): Record<number, number[]> => {
+  return generateRandomOffs(year, month, CLAUDIA_RANDOM_OFFS);
+};
+
+// Gera folgas aleatórias para Irene
+const generateIreneRandomOffs = (year: number, month: number): Record<number, number[]> => {
+  return generateRandomOffs(year, month, IRENE_RANDOM_OFFS);
 };
 
 export const generateSchedule = (
@@ -69,8 +86,9 @@ export const generateSchedule = (
   // Semana de referência fixa (Semana 10 de 2026 como base de rotação conforme pedido original)
   const refWeek = 10;
   
-  // Gera o mapa de folgas aleatórias para Cláudia: semana ISO -> padrão de folga
+  // Gera o mapa de folgas aleatórias: semana ISO -> padrão de folga
   const claudiaWeeklyOffs = generateClaudiaRandomOffs(year, month);
+  const ireneWeeklyOffs = generateIreneRandomOffs(year, month);
 
   days.forEach((day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -90,9 +108,16 @@ export const generateSchedule = (
       
       if (staff === 'Cláudia') {
         // Para Cláudia, verifica se a semana ISO tem um padrão de folga
-        // e se o dia atual pertence a esse padrão
         if (claudiaWeeklyOffs[isoWeek]) {
           offDays = claudiaWeeklyOffs[isoWeek];
+        }
+      } else if (staff === 'Irene') {
+        // Para Irene, verifica se a semana ISO tem um padrão de folga
+        if (ireneWeeklyOffs[isoWeek]) {
+          offDays = ireneWeeklyOffs[isoWeek];
+        } else {
+          // Para outros, usa a configuração padrão
+          offDays = DS_GROUPS[config.offDayGroup] || [];
         }
       } else {
         // Para outros, usa a configuração padrão
