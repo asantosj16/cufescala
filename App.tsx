@@ -161,20 +161,17 @@ const App: React.FC = () => {
 
   const calculateActualHours = (staff: StaffName): number => 
     monthShifts.filter(s => s.staffId === staff).reduce((acc, curr) => {
-      let h = SHIFT_DETAILS[curr.shift]?.hours || 0;
-      if (curr.shift === ShiftType.F) {
-         const dIdx = getDay(parseISO(curr.date));
-         h = (staff === 'Licínia') ? ([5,6,0,1].includes(dIdx) ? 5 : 0) : ([1,2,3,4,5].includes(dIdx) ? 8 : 0);
+      // Ignora férias (F), feriados (FP) e descansos (DS) - conta apenas turnos reais trabalhados
+      if (curr.shift === ShiftType.F || curr.shift === ShiftType.FP || curr.shift === ShiftType.DS) {
+        return acc;
       }
-      return acc + h;
+      return acc + (SHIFT_DETAILS[curr.shift]?.hours || 0);
     }, 0);
 
   const calculateTargetHours = (staff: StaffName): number => {
     return monthShifts.filter(s => s.staffId === staff).reduce((acc, curr) => {
-      if (holidays.includes(curr.date) || curr.shift === ShiftType.FP) {
-        return acc;
-      }
-      if (curr.shift === ShiftType.DS || curr.shift === ShiftType.F) {
+      // Exclui feriados (FP), descansos (DS), férias (F) e feriados da meta
+      if (holidays.includes(curr.date) || curr.shift === ShiftType.FP || curr.shift === ShiftType.DS || curr.shift === ShiftType.F) {
         return acc;
       }
       return acc + (SHIFT_DETAILS[curr.shift]?.hours || 0);
@@ -410,16 +407,17 @@ const App: React.FC = () => {
                   <div className="text-right">
                     <div className="flex items-center justify-end gap-1.5 text-blue-500 print:text-slate-800">
                       <Clock size={14} className="md:w-[18px] md:h-[18px]" />
-                      <span className="text-xl md:text-3xl font-black tabular-nums">{actual}h</span>
+                      <span className="text-xl md:text-3xl font-black tabular-nums">{actual}</span>
                     </div>
-                    <div className="text-[8px] md:text-[10px] font-black opacity-30 uppercase tracking-[0.15em]">Efetivadas</div>
+                    <div className="text-[8px] md:text-[10px] font-black opacity-30 uppercase tracking-[0.15em]">Horas Efetivadas</div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2.5 md:gap-4">
                   <div className={`p-2.5 md:p-4 rounded-2xl md:rounded-3xl border flex flex-col items-center justify-center ${darkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-300`}>
-                    <p className="text-[7px] md:text-[9px] font-black opacity-40 uppercase tracking-widest mb-0.5 md:mb-1.5">Meta</p>
-                    <p className="font-black text-xs md:text-base">{target}h</p>
+                    <p className="text-[7px] md:text-[9px] font-black opacity-40 uppercase tracking-widest mb-0.5 md:mb-1.5">Meta Esperada</p>
+                    <p className="font-black text-xs md:text-base">{target}</p>
+                    <p className="text-[6px] md:text-[8px] font-bold opacity-50 mt-1">horas</p>
                   </div>
                   
                   <div className={`p-2.5 md:p-4 rounded-2xl md:rounded-3xl border-2 flex flex-col items-center justify-center transition-all ${
@@ -427,12 +425,15 @@ const App: React.FC = () => {
                     isNeg ? (darkMode ? 'bg-rose-950/30 border-rose-500/40 text-rose-400' : 'bg-rose-50 border-rose-200 text-rose-700') :
                     (darkMode ? 'bg-slate-800/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-500')
                   } print:bg-white print:border-slate-400 print:text-slate-900`}>
-                    <div className="flex items-center gap-1 mb-0.5">
+                    <div className="flex items-center gap-1 mb-1 md:mb-2">
                       <TrendingUp size={8} className="opacity-60 md:w-[10px] md:h-[10px]" />
                       <p className="text-[7px] md:text-[9px] font-black uppercase tracking-widest opacity-80">Saldo</p>
                     </div>
-                    <p className="font-black text-sm md:text-lg tabular-nums">
-                      {isPos ? `+${balance}h` : `${balance}h`}
+                    <p className="font-black text-sm md:text-lg tabular-nums leading-none">
+                      {balance === 0 ? '0h' : isPos ? `+${balance}h` : `${balance}h`}
+                    </p>
+                    <p className="text-[7px] md:text-[8px] font-bold opacity-60 mt-1 md:mt-1.5">
+                      {isPos ? 'Excesso' : isNeg ? 'Falta' : 'Equilibrado'}
                     </p>
                   </div>
                 </div>
