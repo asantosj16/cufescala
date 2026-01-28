@@ -9,30 +9,28 @@ const DS_GROUPS = {
   CUSTOM: []
 };
 
-// Folgas aleatórias para Cláudia
-// Padrão: Sábado+Domingo → Sexta+Sábado → Domingo+Segunda
+// Folgas para Cláudia (aplicadas às 4 semanas do mês)
+// Semana 1: Sexta + Sábado, Semana 2: Domingo + Segunda, Semana 3: Sábado + Domingo, Semana 4: sem folga
 const CLAUDIA_RANDOM_OFFS = [
-  [6, 0], // Índice 0: Sábado + Domingo
-  [5, 6], // Índice 1: Sexta + Sábado
-  [0, 1], // Índice 2: Domingo + Segunda
+  [5, 6], // Semana 1: Sexta + Sábado
+  [0, 1], // Semana 2: Domingo + Segunda
+  [6, 0], // Semana 3: Sábado + Domingo
+  [],     // Semana 4: sem folga especial (segue rotação normal)
 ];
 
-// Folgas aleatórias para Irene
-// Padrão: Sexta+Sábado → Domingo+Segunda → Sábado+Domingo
+// Folgas para Irene (aplicadas às 4 semanas do mês)
+// Semana 1: Sábado + Domingo, Semana 2: Sexta + Sábado, Semana 3: Domingo + Segunda, Semana 4: sem folga
 const IRENE_RANDOM_OFFS = [
-  [5, 6], // Índice 0: Sexta + Sábado
-  [0, 1], // Índice 1: Domingo + Segunda
-  [6, 0], // Índice 2: Sábado + Domingo
+  [6, 0], // Semana 1: Sábado + Domingo
+  [5, 6], // Semana 2: Sexta + Sábado
+  [0, 1], // Semana 3: Domingo + Segunda
+  [],     // Semana 4: sem folga especial (segue rotação normal)
 ];
 
-// Função genérica para gerar folgas aleatórias
-// Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
-// Garante que SEMPRE haja as 3 folgas em cada mês (2 dias consecutivos cada)
-// com 4 semanas selecionadas do mês
-const generateRandomOffs = (year: number, month: number, staffOffsPattern: number[][]): Record<number, number[]> => {
-  // Seed determinístico baseado no mês/ano para consistência
-  const seed = year * 12 + month;
-  
+// Função genérica para gerar folgas fixas
+// Retorna um mapa de semana ISO -> padrão de folga
+// Aplica os padrões sequencialmente às 4 primeiras semanas do mês
+const generateWeeklyOffs = (year: number, month: number, staffOffsPattern: number[][]): Record<number, number[]> => {
   // Obtém semanas ISO do mês
   const start = startOfMonth(new Date(year, month));
   const end = endOfMonth(start);
@@ -43,39 +41,40 @@ const generateRandomOffs = (year: number, month: number, staffOffsPattern: numbe
     weeksInMonth.add(getISOWeek(day));
   });
   
-  // Pega as 4 primeiras semanas reais do mês
+  // Pega as 4 primeiras semanas reais do mês em ordem
   const weeks = Array.from(weeksInMonth).sort((a, b) => a - b).slice(0, 4);
   
-  // Embaralha as 4 semanas selecionadas de forma determinística
-  const shuffled = [...weeks];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor((seed * 9973 + i * 137) % (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  
-  // Seleciona 3 semanas das 4
-  const selectedWeeks = shuffled.slice(0, 3);
-  
-  // Usa a ordem definida no padrão da pessoa (já validada para não ter conflitos)
-  const patterns = [staffOffsPattern[0], staffOffsPattern[1], staffOffsPattern[2]];
-  
-  // Aloca os padrões para as 3 semanas selecionadas
+  // Aloca os padrões sequencialmente às 4 semanas
   const weekOffMap: Record<number, number[]> = {};
-  for (let i = 0; i < selectedWeeks.length; i++) {
-    weekOffMap[selectedWeeks[i]] = patterns[i];
+  for (let i = 0; i < weeks.length && i < staffOffsPattern.length; i++) {
+    weekOffMap[weeks[i]] = staffOffsPattern[i];
   }
   
   return weekOffMap;
 };
 
-// Gera folgas aleatórias para Cláudia
+// Gera folgas para Cláudia
 const generateClaudiaRandomOffs = (year: number, month: number): Record<number, number[]> => {
-  return generateRandomOffs(year, month, CLAUDIA_RANDOM_OFFS);
+  return generateWeeklyOffs(year, month, CLAUDIA_RANDOM_OFFS);
 };
 
-// Gera folgas aleatórias para Irene
+// Gera folgas para Irene
 const generateIreneRandomOffs = (year: number, month: number): Record<number, number[]> => {
-  return generateRandomOffs(year, month, IRENE_RANDOM_OFFS);
+  return generateWeeklyOffs(year, month, IRENE_RANDOM_OFFS);
+};
+
+// Folgas para Licínia (aplicadas às 4 semanas do mês)
+// Semana 1-3: sem folga especial (segue rotação normal), Semana 4: Sábado + Domingo
+const LICINIA_WEEKLY_OFFS = [
+  [],     // Semana 1: sem folga especial (segue rotação normal)
+  [],     // Semana 2: sem folga especial (segue rotação normal)
+  [],     // Semana 3: sem folga especial (segue rotação normal)
+  [6, 0], // Semana 4: Sábado + Domingo
+];
+
+// Gera folgas para Licínia
+const generateLiciniaWeeklyOffs = (year: number, month: number): Record<number, number[]> => {
+  return generateWeeklyOffs(year, month, LICINIA_WEEKLY_OFFS);
 };
 
 export const generateSchedule = (
@@ -92,9 +91,10 @@ export const generateSchedule = (
   // Semana de referência fixa (Semana 10 de 2026 como base de rotação conforme pedido original)
   const refWeek = 10;
   
-  // Gera o mapa de folgas aleatórias: semana ISO -> padrão de folga
+  // Gera o mapa de folgas: semana ISO -> padrão de folga
   const claudiaWeeklyOffs = generateClaudiaRandomOffs(year, month);
   const ireneWeeklyOffs = generateIreneRandomOffs(year, month);
+  const liciniaWeeklyOffs = generateLiciniaWeeklyOffs(year, month);
 
   // Primeiro passo: gera shifts para Cláudia e Irene para identificar quando ambas trabalham juntas
   const claudiaShifts: Record<string, ShiftType> = {};
@@ -178,6 +178,11 @@ export const generateSchedule = (
           // Para outros, usa a configuração padrão
           offDays = DS_GROUPS[config.offDayGroup] || [];
         }
+      } else if (staff === 'Licínia') {
+        // Para Licínia, verifica se a semana ISO tem um padrão de folga
+        if (liciniaWeeklyOffs[isoWeek]) {
+          offDays = liciniaWeeklyOffs[isoWeek];
+        }
       } else {
         // Para outros, usa a configuração padrão
         offDays = DS_GROUPS[config.offDayGroup] || [];
@@ -209,21 +214,9 @@ export const generateSchedule = (
           shift = ShiftType.T6;
           break;
         case RotationType.WEEKEND_COVER:
-          // Lógica específica Licínia: sexta a segunda
-          // Se é sábado ou domingo e ambas Cláudia e Irene estão trabalhando, Licínia tem folga
-          if ([6, 0].includes(dayOfWeek)) {
-            const claudiaWorking = claudiaShifts[dateStr] && claudiaShifts[dateStr] !== ShiftType.DS;
-            const ireneWorking = ireneShifts[dateStr] && ireneShifts[dateStr] !== ShiftType.DS;
-            
-            if (claudiaWorking && ireneWorking) {
-              shift = ShiftType.DS;
-            } else if ([5, 6, 0, 1].includes(dayOfWeek)) {
-              shift = (isoWeek % 2 === 0) ? ShiftType.S178 : ShiftType.T94;
-            } else {
-              shift = ShiftType.DS;
-            }
-          } else if ([5, 1].includes(dayOfWeek)) {
-            // Sexta e Segunda: segue o padrão normal
+          // Lógica específica Licínia: trabalha sexta a segunda
+          // Padrão semanal define quando tem folga (semana 4: sáb+dom, semanas 1-3: normal)
+          if ([5, 6, 0, 1].includes(dayOfWeek)) {
             shift = (isoWeek % 2 === 0) ? ShiftType.S178 : ShiftType.T94;
           } else {
             shift = ShiftType.DS;
