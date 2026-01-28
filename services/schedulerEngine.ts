@@ -18,7 +18,7 @@ const CLAUDIA_RANDOM_OFFS = [
 
 // Gera folgas aleatórias para Cláudia no mês
 // Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
-// Garante que SEMPRE haja as 3 folgas em cada mês
+// Garante que SEMPRE haja as 3 folgas em cada mês (2 dias consecutivos cada)
 const generateClaudiaRandomOffs = (year: number, month: number): Record<number, number[]> => {
   // Seed determinístico baseado no mês/ano para consistência
   const seed = year * 12 + month;
@@ -33,22 +33,27 @@ const generateClaudiaRandomOffs = (year: number, month: number): Record<number, 
     weeksInMonth.add(getISOWeek(day));
   });
   
-  const weeks = Array.from(weeksInMonth).sort((a, b) => a - b);
+  // Pega SEMPRE as 3 primeiras semanas reais do mês
+  const weeks = Array.from(weeksInMonth).sort((a, b) => a - b).slice(0, 3);
   
-  // Se houver menos de 3 semanas, adiciona semanas fictícias para garantir 3 folgas
-  while (weeks.length < 3) {
-    weeks.push(Math.max(...weeks) + 1);
+  // Se houver menos de 3 semanas, não há como garantir 3 folgas diferentes
+  // Portanto, usamos as semanas disponíveis e ciclamos
+  let selectedWeeks = [...weeks];
+  while (selectedWeeks.length < 3) {
+    // Adiciona a próxima semana após a última
+    const nextWeek = Math.max(...selectedWeeks) + 1;
+    selectedWeeks.push(nextWeek);
   }
   
-  // Embaralha as semanas de forma determinística
-  const shuffled = [...weeks];
+  // Embaralha apenas as 3 semanas selecionadas de forma determinística
+  const shuffled = selectedWeeks.slice();
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor((seed * 9973 + i * 137) % (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   
-  // Aloca os 3 tipos de folga para as primeiras 3 semanas
-  // Cada semana tem exatamente UM padrão de folga
+  // Aloca os 3 tipos de folga para as 3 semanas selecionadas
+  // Cada semana tem exatamente UM padrão de folga (2 dias consecutivos)
   const weekOffMap: Record<number, number[]> = {};
   for (let i = 0; i < 3; i++) {
     weekOffMap[shuffled[i]] = CLAUDIA_RANDOM_OFFS[i];
