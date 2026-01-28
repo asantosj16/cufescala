@@ -429,10 +429,13 @@ const App: React.FC = () => {
                       <TrendingUp size={8} className="opacity-60 md:w-[10px] md:h-[10px]" />
                       <p className="text-[7px] md:text-[9px] font-black uppercase tracking-widest opacity-80">Saldo</p>
                     </div>
-                    <p className="font-black text-sm md:text-lg tabular-nums leading-none">
-                      {balance === 0 ? '0h' : isPos ? `+${balance}h` : `${balance}h`}
-                    </p>
-                    <p className="text-[7px] md:text-[8px] font-bold opacity-60 mt-1 md:mt-1.5">
+                    <div className="flex items-baseline gap-1 mb-1">
+                      <p className="font-black text-sm md:text-lg tabular-nums leading-none">
+                        {balance === 0 ? '0' : isPos ? `+${balance}` : balance}
+                      </p>
+                      <p className="text-[7px] md:text-[9px] font-bold opacity-70">h</p>
+                    </div>
+                    <p className="text-[7px] md:text-[8px] font-bold opacity-60">
                       {isPos ? 'Excesso' : isNeg ? 'Falta' : 'Equilibrado'}
                     </p>
                   </div>
