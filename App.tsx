@@ -39,6 +39,7 @@ import { STAFF_LIST, SHIFT_DETAILS } from './constants';
 import { generateSchedule } from './services/schedulerEngine';
 import { ShiftBadge } from './components/ShiftBadge';
 import { InfoSchedule } from './components/InfoSchedule';
+import { AlertsLegend } from './components/AlertsLegend';
 import { storage } from './services/storageService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
@@ -536,6 +537,9 @@ const App: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* Legenda de Turnos */}
+        <AlertsLegend darkMode={darkMode} />
       </main>
 
       {/* Configurações Modais */}
