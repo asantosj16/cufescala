@@ -38,6 +38,7 @@ import { ShiftType, StaffName, CustomOverrides, RotationType, StaffConfig, OffDa
 import { STAFF_LIST, SHIFT_DETAILS } from './constants';
 import { generateSchedule } from './services/schedulerEngine';
 import { ShiftBadge } from './components/ShiftBadge';
+import { InfoSchedule } from './components/InfoSchedule';
 import { storage } from './services/storageService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
@@ -404,6 +405,9 @@ const App: React.FC = () => {
             }} className="hidden" accept=".json" />
           </div>
         </section>
+
+        {/* Informações de Funcionárias, Horários e Folgas */}
+        <InfoSchedule darkMode={darkMode} />
 
         {/* Resumo de Horas & Saldo - Responsivo e HD */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
