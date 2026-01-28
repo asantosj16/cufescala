@@ -40,6 +40,7 @@ import { generateSchedule } from './services/schedulerEngine';
 import { ShiftBadge } from './components/ShiftBadge';
 import { InfoSchedule } from './components/InfoSchedule';
 import { AlertsLegend } from './components/AlertsLegend';
+import { WeeklyAlertsPanel } from './components/WeeklyAlertsPanel';
 import { storage } from './services/storageService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
@@ -60,7 +61,7 @@ const weekdayNamesShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const App: React.FC = () => {
   // Inicializa em Fevereiro de 2026
   const [currentDate, setCurrentDate] = useState(new Date(2026, 1, 1)); 
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('cuf-theme') === 'dark');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('cuf-theme') !== 'light');
   const [showSettings, setShowSettings] = useState(false);
   
   const [configs, setConfigs] = useState<Record<StaffName, StaffConfig>>(() => {
@@ -409,6 +410,9 @@ const App: React.FC = () => {
 
         {/* Informações de Funcionárias, Horários e Folgas */}
         <InfoSchedule darkMode={darkMode} />
+
+        {/* Alertas de Horas Excedentes */}
+        <WeeklyAlertsPanel darkMode={darkMode} monthShifts={monthShifts} weeklyLimits={WEEKLY_HOUR_LIMITS} />
 
         {/* Resumo de Horas & Saldo - Responsivo e HD */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
