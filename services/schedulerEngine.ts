@@ -9,17 +9,19 @@ const DS_GROUPS = {
   CUSTOM: []
 };
 
-// Folgas aleatórias para Cláudia: (Sexta+Sábado), (Sábado+Domingo), (Domingo+Segunda)
+// Folgas aleatórias para Cláudia
+// Padrão: Sábado+Domingo → Sexta+Sábado → Domingo+Segunda
 const CLAUDIA_RANDOM_OFFS = [
-  [0, 1], // Índice 0: Domingo + Segunda
+  [6, 0], // Índice 0: Sábado + Domingo
   [5, 6], // Índice 1: Sexta + Sábado
-  [6, 0], // Índice 2: Sábado + Domingo
+  [0, 1], // Índice 2: Domingo + Segunda
 ];
 
-// Folgas aleatórias para Irene: (Sábado+Domingo), (Sexta+Sábado), (Domingo+Segunda)
+// Folgas aleatórias para Irene
+// Padrão: Sexta+Sábado → Domingo+Segunda → Sábado+Domingo
 const IRENE_RANDOM_OFFS = [
-  [0, 1], // Índice 0: Domingo + Segunda
-  [5, 6], // Índice 1: Sexta + Sábado
+  [5, 6], // Índice 0: Sexta + Sábado
+  [0, 1], // Índice 1: Domingo + Segunda
   [6, 0], // Índice 2: Sábado + Domingo
 ];
 
@@ -27,7 +29,6 @@ const IRENE_RANDOM_OFFS = [
 // Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
 // Garante que SEMPRE haja as 3 folgas em cada mês (2 dias consecutivos cada)
 // com 4 semanas selecionadas do mês
-// Usa ordem válida: [0,1], [1,2] ou [0,1], [2,1] para evitar conflitos
 const generateRandomOffs = (year: number, month: number, staffOffsPattern: number[][]): Record<number, number[]> => {
   // Seed determinístico baseado no mês/ano para consistência
   const seed = year * 12 + month;
@@ -55,22 +56,8 @@ const generateRandomOffs = (year: number, month: number, staffOffsPattern: numbe
   // Seleciona 3 semanas das 4
   const selectedWeeks = shuffled.slice(0, 3);
   
-  // Constrói a ordem de padrões para evitar sobreposições
-  // staffOffsPattern[0] = [0,1] (Domingo+Segunda) - sempre primeiro, não conflita
-  // staffOffsPattern[1] = [5,6] (Sexta+Sábado)
-  // staffOffsPattern[2] = [6,0] (Sábado+Domingo)
-  // Ordem válidas: [0], [1], [2] ou [0], [2], [1]
-  // Ambas válidas! [0]→[1] OK, [1]→[2] OK. E [0]→[2] OK, [2]→[1] OK.
-  
-  let patterns: number[][];
-  
-  if (seed % 2 === 0) {
-    // Ordem 1: [0,1], [5,6], [6,0]
-    patterns = [staffOffsPattern[0], staffOffsPattern[1], staffOffsPattern[2]];
-  } else {
-    // Ordem 2: [0,1], [6,0], [5,6]
-    patterns = [staffOffsPattern[0], staffOffsPattern[2], staffOffsPattern[1]];
-  }
+  // Usa a ordem definida no padrão da pessoa (já validada para não ter conflitos)
+  const patterns = [staffOffsPattern[0], staffOffsPattern[1], staffOffsPattern[2]];
   
   // Aloca os padrões para as 3 semanas selecionadas
   const weekOffMap: Record<number, number[]> = {};
