@@ -143,6 +143,15 @@ const App: React.FC = () => {
         storage.saveData('cuf-holidays-v3', holidays),
         storage.saveData('cuf-roster-configs', configs),
       ]).then(() => {
+        // Publica a sincronização para outros dispositivos
+        syncService.publishSync({
+          overrides,
+          holidays,
+          configs,
+          timestamp: Date.now(),
+          deviceId: syncService.getDeviceId(),
+        });
+        
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }).catch(err => {

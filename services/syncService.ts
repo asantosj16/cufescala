@@ -23,7 +23,7 @@ class SyncService {
   private callbacks: SyncCallback[] = [];
   private broadcastChannel: BroadcastChannel | null = null;
   private deviceId: string;
-  private lastSyncTimestamps: Record<string, number> = {};
+  private lastSyncTimestamps: Record<string, number | string> = {};
   private pollInterval: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -112,10 +112,13 @@ class SyncService {
    * Útil para detectar mudanças feitas por outras abas/dispositivos mesmo sem events
    */
   private startPolling(): void {
-    // Polling a cada 5 segundos para sincronizar dados
+    // Faz uma verificação inicial imediatamente
+    this.checkForChanges();
+    
+    // Polling a cada 3 segundos para sincronizar dados (mais rápido que antes)
     this.pollInterval = setInterval(() => {
       this.checkForChanges();
-    }, 5000);
+    }, 3000);
   }
 
   /**
@@ -126,15 +129,26 @@ class SyncService {
     
     keys.forEach(key => {
       const currentValue = localStorage.getItem(key);
-      const lastTimestamp = this.lastSyncTimestamps[key] || 0;
+      const lastKnownValue = this.lastSyncTimestamps[`${key}__value`] as string | undefined;
+      const lastTimestamp = (this.lastSyncTimestamps[key] as number) || 0;
       const modificationTime = this.getLocalStorageModificationTime(key);
 
-      // Se foi modificado após a última sincronização conhecida
-      if (modificationTime > lastTimestamp) {
-        console.log(`Mudança detectada via polling: ${key}`);
+      // Verifica se o valor mudou (não apenas pelo timestamp)
+      const currentValueStr = currentValue || '';
+      const hasValueChanged = lastKnownValue !== currentValueStr;
+      const hasTimestampChanged = modificationTime > lastTimestamp;
+
+      // Se mudou o valor OU o timestamp, sincroniza
+      if (hasValueChanged || hasTimestampChanged) {
+        if (hasValueChanged) {
+          console.log(`Mudança de valor detectada via polling: ${key}`);
+        }
+        if (hasTimestampChanged) {
+          console.log(`Mudança de timestamp detectada via polling: ${key}`);
+        }
         
         const syncData: SyncData = {
-          timestamp: modificationTime,
+          timestamp: modificationTime || Date.now(),
           deviceId: this.deviceId,
         };
 
@@ -147,7 +161,8 @@ class SyncService {
         }
 
         this.notifyCallbacks(syncData);
-        this.lastSyncTimestamps[key] = modificationTime;
+        this.lastSyncTimestamps[key] = modificationTime || Date.now();
+        this.lastSyncTimestamps[`${key}__value`] = currentValueStr;
       }
     });
   }
@@ -192,6 +207,20 @@ class SyncService {
         console.error('Erro ao executar callback de sincronização:', e);
       }
     });
+    
+    // Atualiza os timestamps de última sincronização conhecida
+    if (data.overrides !== undefined) {
+      this.lastSyncTimestamps['cuf-overrides-v3'] = data.timestamp;
+      this.lastSyncTimestamps['cuf-overrides-v3__value'] = JSON.stringify(data.overrides);
+    }
+    if (data.holidays !== undefined) {
+      this.lastSyncTimestamps['cuf-holidays-v3'] = data.timestamp;
+      this.lastSyncTimestamps['cuf-holidays-v3__value'] = JSON.stringify(data.holidays);
+    }
+    if (data.configs !== undefined) {
+      this.lastSyncTimestamps['cuf-roster-configs'] = data.timestamp;
+      this.lastSyncTimestamps['cuf-roster-configs__value'] = JSON.stringify(data.configs);
+    }
   }
 
   /**

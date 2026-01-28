@@ -46,6 +46,12 @@ class StorageService {
     try {
       // Sempre salva no localStorage primeiro (mais rápido)
       localStorage.setItem(key, JSON.stringify(data));
+      
+      // Salva metadata com timestamp para sincronização
+      localStorage.setItem(`${key}__metadata`, JSON.stringify({
+        lastModified: Date.now(),
+        version: 1
+      }));
 
       // Tenta salvar no IndexedDB como backup
       try {
