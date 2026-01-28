@@ -115,10 +115,11 @@ class SyncService {
     // Faz uma verificação inicial imediatamente
     this.checkForChanges();
     
-    // Polling a cada 3 segundos para sincronizar dados (mais rápido que antes)
+    // Polling MAIS AGRESSIVO para sincronização entre dispositivos
+    // A cada 1 segundo para garantir sincronização rápida
     this.pollInterval = setInterval(() => {
       this.checkForChanges();
-    }, 3000);
+    }, 1000);
   }
 
   /**
@@ -129,23 +130,18 @@ class SyncService {
     
     keys.forEach(key => {
       const currentValue = localStorage.getItem(key);
-      const lastKnownValue = this.lastSyncTimestamps[`${key}__value`] as string | undefined;
+      const currentHash = this.hashString(currentValue || '');
+      const lastKnownHash = this.lastSyncTimestamps[`${key}__hash`] as string | undefined;
       const lastTimestamp = (this.lastSyncTimestamps[key] as number) || 0;
       const modificationTime = this.getLocalStorageModificationTime(key);
 
-      // Verifica se o valor mudou (não apenas pelo timestamp)
-      const currentValueStr = currentValue || '';
-      const hasValueChanged = lastKnownValue !== currentValueStr;
+      // Verifica se o hash mudou (detecção mais confiável que string completa)
+      const hasValueChanged = lastKnownHash !== currentHash;
       const hasTimestampChanged = modificationTime > lastTimestamp;
 
       // Se mudou o valor OU o timestamp, sincroniza
       if (hasValueChanged || hasTimestampChanged) {
-        if (hasValueChanged) {
-          console.log(`Mudança de valor detectada via polling: ${key}`);
-        }
-        if (hasTimestampChanged) {
-          console.log(`Mudança de timestamp detectada via polling: ${key}`);
-        }
+        console.log(`Mudança detectada: ${key} (hash: ${lastKnownHash || 'inicial'} → ${currentHash})`);
         
         const syncData: SyncData = {
           timestamp: modificationTime || Date.now(),
@@ -162,9 +158,22 @@ class SyncService {
 
         this.notifyCallbacks(syncData);
         this.lastSyncTimestamps[key] = modificationTime || Date.now();
-        this.lastSyncTimestamps[`${key}__value`] = currentValueStr;
+        this.lastSyncTimestamps[`${key}__hash`] = currentHash;
       }
     });
+  }
+
+  /**
+   * Gera um hash simples de uma string para detectar mudanças rapidamente
+   */
+  private hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Converte para inteiro 32-bit
+    }
+    return Math.abs(hash).toString(36);
   }
 
   /**
@@ -208,18 +217,18 @@ class SyncService {
       }
     });
     
-    // Atualiza os timestamps de última sincronização conhecida
+    // Atualiza os timestamps e hashes de última sincronização conhecida
     if (data.overrides !== undefined) {
       this.lastSyncTimestamps['cuf-overrides-v3'] = data.timestamp;
-      this.lastSyncTimestamps['cuf-overrides-v3__value'] = JSON.stringify(data.overrides);
+      this.lastSyncTimestamps['cuf-overrides-v3__hash'] = this.hashString(JSON.stringify(data.overrides));
     }
     if (data.holidays !== undefined) {
       this.lastSyncTimestamps['cuf-holidays-v3'] = data.timestamp;
-      this.lastSyncTimestamps['cuf-holidays-v3__value'] = JSON.stringify(data.holidays);
+      this.lastSyncTimestamps['cuf-holidays-v3__hash'] = this.hashString(JSON.stringify(data.holidays));
     }
     if (data.configs !== undefined) {
       this.lastSyncTimestamps['cuf-roster-configs'] = data.timestamp;
-      this.lastSyncTimestamps['cuf-roster-configs__value'] = JSON.stringify(data.configs);
+      this.lastSyncTimestamps['cuf-roster-configs__hash'] = this.hashString(JSON.stringify(data.configs));
     }
   }
 
