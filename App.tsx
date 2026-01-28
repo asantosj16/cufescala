@@ -42,7 +42,6 @@ import { InfoSchedule } from './components/InfoSchedule';
 import { AlertsLegend } from './components/AlertsLegend';
 import { WeeklyAlertsPanel } from './components/WeeklyAlertsPanel';
 import { storage } from './services/storageService';
-import { syncService } from './services/syncService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
   'Cláudia': { rotation: RotationType.ALTERNATING, offDayGroup: 'DS1', startShift: ShiftType.T6 },
@@ -90,46 +89,6 @@ const App: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Controle de navegação com histórico do navegador
-  useEffect(() => {
-    // Quando showSettings muda, atualiza o histórico
-    if (showSettings) {
-      window.history.pushState({ modal: 'settings' }, '', window.location.href);
-    }
-  }, [showSettings]);
-
-  // Quando editingShift muda, atualiza o histórico
-  useEffect(() => {
-    if (editingShift) {
-      window.history.pushState({ modal: 'editShift', data: editingShift }, '', window.location.href);
-    }
-  }, [editingShift]);
-
-  // Listener para o botão voltar do navegador
-  useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      const state = event.state;
-      
-      if (!state || (!state.modal)) {
-        // Volta para a página inicial (fecha todos os modais)
-        setShowSettings(false);
-        setEditingShift(null);
-      } else if (state.modal === 'settings') {
-        setShowSettings(true);
-        setEditingShift(null);
-      } else if (state.modal === 'editShift' && state.data) {
-        setShowSettings(false);
-        setEditingShift(state.data);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, []);
-
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('cuf-theme', darkMode ? 'dark' : 'light');
@@ -143,15 +102,6 @@ const App: React.FC = () => {
         storage.saveData('cuf-holidays-v3', holidays),
         storage.saveData('cuf-roster-configs', configs),
       ]).then(() => {
-        // Publica a sincronização para outros dispositivos
-        syncService.publishSync({
-          overrides,
-          holidays,
-          configs,
-          timestamp: Date.now(),
-          deviceId: syncService.getDeviceId(),
-        });
-        
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }).catch(err => {
@@ -162,51 +112,6 @@ const App: React.FC = () => {
     
     return () => clearTimeout(timeout);
   }, [overrides, holidays, configs]);
-
-  // Listener para sincronização de dados entre dispositivos
-  useEffect(() => {
-    const unsubscribe = syncService.onSync((syncData) => {
-      console.log('Sincronização recebida:', syncData);
-
-      // Atualiza overrides se recebeu mudança
-      if (syncData.overrides !== undefined) {
-        setOverrides(prev => {
-          const merged = { ...prev, ...syncData.overrides };
-          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
-        });
-      }
-
-      // Atualiza holidays se recebeu mudança
-      if (syncData.holidays !== undefined) {
-        setHolidays(prev => {
-          const merged = [...new Set([...prev, ...syncData.holidays!])];
-          merged.sort();
-          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
-        });
-      }
-
-      // Atualiza configs se recebeu mudança
-      if (syncData.configs !== undefined) {
-        setConfigs(prev => {
-          const merged = { ...prev, ...syncData.configs };
-          return JSON.stringify(merged) === JSON.stringify(prev) ? prev : merged;
-        });
-      }
-
-      // Atualiza tema se recebeu mudança
-      if (syncData.theme !== undefined) {
-        const isDark = syncData.theme === 'dark';
-        if (isDark !== darkMode) {
-          setDarkMode(isDark);
-        }
-      }
-    });
-
-    // Cleanup ao desmontar
-    return () => {
-      unsubscribe();
-    };
-  }, [darkMode]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -700,8 +605,8 @@ const App: React.FC = () => {
 
       {/* Configurações Modais */}
       {showSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-300" onClick={() => window.history.back()}>
-          <div className={`w-full max-w-2xl rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-hidden border flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className={`w-full max-w-2xl rounded-[2rem] sm:rounded-[2.5rem] shadow-[0_0_50px_rgba(0,0,0,0.3)] overflow-hidden border flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
             <div className={`p-5 md:p-8 flex items-center justify-between border-b shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
               <div className="flex items-center gap-3 text-blue-500">
                 <div className="p-2.5 bg-blue-500/10 rounded-2xl"><Settings size={24} /></div>
@@ -710,7 +615,7 @@ const App: React.FC = () => {
                   <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest">Ajustes de rotas e folgas</p>
                 </div>
               </div>
-              <button onClick={() => window.history.back()} className="p-3 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><X size={24} /></button>
+              <button onClick={() => setShowSettings(false)} className="p-3 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><X size={24} /></button>
             </div>
             <div className="p-5 md:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
               {STAFF_LIST.map(staff => (
@@ -769,7 +674,7 @@ const App: React.FC = () => {
               ))}
             </div>
             <div className={`p-5 md:p-8 border-t bg-slate-50/50 dark:bg-slate-950/50 shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
-              <button onClick={() => window.history.back()} className="w-full py-4 md:py-6 bg-blue-600 text-white font-black rounded-2xl md:rounded-3xl shadow-2xl hover:bg-blue-700 transition-all uppercase tracking-[0.2em] text-[11px] md:text-sm">Aplicar Configurações</button>
+              <button onClick={() => setShowSettings(false)} className="w-full py-4 md:py-6 bg-blue-600 text-white font-black rounded-2xl md:rounded-3xl shadow-2xl hover:bg-blue-700 transition-all uppercase tracking-[0.2em] text-[11px] md:text-sm">Aplicar Configurações</button>
             </div>
           </div>
         </div>
@@ -777,8 +682,8 @@ const App: React.FC = () => {
 
       {/* Modal de Edição de Turno */}
       {editingShift && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => window.history.back()}>
-          <div className={`w-full max-w-md rounded-[2.5rem] shadow-[0_0_40px_rgba(0,0,0,0.3)] overflow-hidden border flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`} onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full max-w-md rounded-[2.5rem] shadow-[0_0_40px_rgba(0,0,0,0.3)] overflow-hidden border flex flex-col max-h-[90vh] ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
             <div className={`p-5 md:p-8 flex items-center justify-between border-b shrink-0 ${darkMode ? 'border-slate-800' : 'border-slate-100'}`}>
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-lg md:text-2xl shadow-lg">{editingShift.staff.charAt(0)}</div>
@@ -787,7 +692,7 @@ const App: React.FC = () => {
                   <p className="text-[9px] md:text-xs font-bold opacity-40 uppercase tracking-widest">{format(parseISO(editingShift.date), "dd 'de' MMMM", { locale: pt })}</p>
                 </div>
               </div>
-              <button onClick={() => window.history.back()} className="p-3 opacity-50 hover:opacity-100 transition-opacity"><X size={24} /></button>
+              <button onClick={() => setEditingShift(null)} className="p-3 opacity-50 hover:opacity-100 transition-opacity"><X size={24} /></button>
             </div>
             <div className="p-5 md:p-8 grid grid-cols-2 gap-3 md:gap-4 overflow-y-auto custom-scrollbar">
               {Object.keys(SHIFT_DETAILS).map(key => {
@@ -795,7 +700,7 @@ const App: React.FC = () => {
                 if (sKey === ShiftType.FP) return null;
                 const isSel = getStaffShift(editingShift.staff, editingShift.date) === sKey;
                 return (
-                  <button key={key} onClick={() => { setOverrides(prev => ({ ...prev, [`${editingShift.staff}-${editingShift.date}`]: sKey })); window.history.back(); }} className={`group p-3 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border-2 transition-all flex flex-col items-center gap-1 md:gap-3 ${isSel ? 'border-blue-500 bg-blue-500/10 shadow-xl scale-105' : 'border-transparent bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
+                  <button key={key} onClick={() => { setOverrides(prev => ({ ...prev, [`${editingShift.staff}-${editingShift.date}`]: sKey })); setEditingShift(null); }} className={`group p-3 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border-2 transition-all flex flex-col items-center gap-1 md:gap-3 ${isSel ? 'border-blue-500 bg-blue-500/10 shadow-xl scale-105' : 'border-transparent bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
                     <span className={`font-black text-lg md:text-2xl transition-colors ${isSel ? 'text-blue-500' : 'text-slate-600 dark:text-slate-300'}`}>{sKey}</span>
                     <span className="text-[8px] md:text-[10px] font-black opacity-40 uppercase tracking-widest text-center leading-tight">{SHIFT_DETAILS[sKey].label}</span>
                   </button>
@@ -803,7 +708,7 @@ const App: React.FC = () => {
               })}
             </div>
             <div className={`p-5 border-t text-center ${darkMode ? 'border-slate-800 bg-slate-900' : 'border-slate-100 bg-slate-50'}`}>
-              <button onClick={() => window.history.back()} className="text-[10px] font-black uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity px-8 py-2">Cancelar</button>
+              <button onClick={() => setEditingShift(null)} className="text-[10px] font-black uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity px-8 py-2">Cancelar</button>
             </div>
           </div>
         </div>
