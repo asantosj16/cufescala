@@ -481,9 +481,6 @@ const App: React.FC = () => {
           })}
         </section>
 
-        {/* Alertas de Horas Excedentes */}
-        <WeeklyAlertsPanel darkMode={darkMode} monthShifts={monthShifts} weeklyLimits={WEEKLY_HOUR_LIMITS} />
-
         {/* Tabela de Escala */}
         <div className={`relative overflow-hidden rounded-[1.5rem] md:rounded-[2.5rem] border shadow-2xl transition-all print:shadow-none print:border-slate-300 print:rounded-none ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
           <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-black/5 dark:from-white/5 pointer-events-none z-10 sm:hidden"></div>
