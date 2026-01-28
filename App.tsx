@@ -46,6 +46,13 @@ const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
   'Licínia': { rotation: RotationType.WEEKEND_COVER, offDayGroup: 'CUSTOM', startShift: ShiftType.M56 },
 };
 
+// Limites de horas semanais
+const WEEKLY_HOUR_LIMITS: Record<StaffName, number> = {
+  'Cláudia': 40,
+  'Irene': 40,
+  'Licínia': 20,
+};
+
 const weekdayNamesShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 const App: React.FC = () => {
@@ -132,7 +139,7 @@ const App: React.FC = () => {
       });
 
       Object.entries(weeklyData).forEach(([week, data]) => {
-        const limit = staff === 'Licínia' ? 20 : 40;
+        const limit = WEEKLY_HOUR_LIMITS[staff];
         if (data.hours > limit) {
           const conflictInfo = {
             message: `Semana ${week}: ${data.hours}h/${limit}h`,
