@@ -161,7 +161,7 @@ const App: React.FC = () => {
 
   const calculateActualHours = (staff: StaffName): number => 
     monthShifts.filter(s => s.staffId === staff).reduce((acc, curr) => {
-      // Ignora férias (F), feriados (FP) e descansos (DS) - conta apenas turnos reais trabalhados
+      // Conta apenas turnos reais trabalhados (ignora férias, feriados e descansos)
       if (curr.shift === ShiftType.F || curr.shift === ShiftType.FP || curr.shift === ShiftType.DS) {
         return acc;
       }
@@ -169,13 +169,33 @@ const App: React.FC = () => {
     }, 0);
 
   const calculateTargetHours = (staff: StaffName): number => {
-    return monthShifts.filter(s => s.staffId === staff).reduce((acc, curr) => {
-      // Exclui feriados (FP), descansos (DS), férias (F) e feriados da meta
-      if (holidays.includes(curr.date) || curr.shift === ShiftType.FP || curr.shift === ShiftType.DS || curr.shift === ShiftType.F) {
-        return acc;
+    // Calcula horas esperadas: número de dias úteis (excluindo domingos, sábados, feriados) x 8h/dia
+    let targetHours = 0;
+    let workDays = 0;
+    
+    monthDays.forEach(day => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const dayOfWeek = getDay(day);
+      
+      // Pula finais de semana e feriados públicos
+      if ([0, 6].includes(dayOfWeek) || holidays.includes(dateStr)) {
+        return;
       }
-      return acc + (SHIFT_DETAILS[curr.shift]?.hours || 0);
-    }, 0);
+      
+      workDays++;
+    });
+    
+    // Horas base por tipo de staff: Licínia trabalha 20h/semana, outros 40h/semana
+    if (staff === 'Licínia') {
+      // Licínia: 5h dia (trabalha Sexta a Segunda)
+      // Conta aproximadamente 4 dias por semana
+      targetHours = Math.round((workDays / 5) * 20); // 20 horas por semana, 5 dias úteis
+    } else {
+      // Cláudia e Irene: 8h dia (segunda a sexta)
+      targetHours = workDays * 8;
+    }
+    
+    return targetHours;
   };
 
   const exportCSV = () => {
