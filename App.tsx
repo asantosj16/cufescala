@@ -42,6 +42,7 @@ import { InfoSchedule } from './components/InfoSchedule';
 import { AlertsLegend } from './components/AlertsLegend';
 import { WeeklyAlertsPanel } from './components/WeeklyAlertsPanel';
 import { storage } from './services/storageService';
+import { syncService } from './services/syncService';
 
 const DEFAULT_CONFIGS: Record<StaffName, StaffConfig> = {
   'Cláudia': { rotation: RotationType.ALTERNATING, offDayGroup: 'DS1', startShift: ShiftType.T6 },
@@ -102,6 +103,15 @@ const App: React.FC = () => {
         storage.saveData('cuf-holidays-v3', holidays),
         storage.saveData('cuf-roster-configs', configs),
       ]).then(() => {
+        // Publica a sincronização para outros dispositivos
+        syncService.publishSync({
+          overrides,
+          holidays,
+          configs,
+          timestamp: Date.now(),
+          deviceId: syncService.getDeviceId(),
+        });
+        
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }).catch(err => {
@@ -112,6 +122,22 @@ const App: React.FC = () => {
     
     return () => clearTimeout(timeout);
   }, [overrides, holidays, configs]);
+
+  // Escuta atualizações de sincronização de outros dispositivos
+  useEffect(() => {
+    const unsubscribe = syncService.onSync((syncData) => {
+      if (syncData.overrides) setOverrides(prev => ({ ...prev, ...syncData.overrides }));
+      if (syncData.holidays) setHolidays(prev => [...new Set([...prev, ...syncData.holidays])]);
+      if (syncData.configs) setConfigs(prev => ({ ...prev, ...syncData.configs }));
+      if (syncData.theme) setDarkMode(syncData.theme === 'dark');
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Inicia o polling de sincronização quando o componente monta
+  useEffect(() => {
+    syncService.startPolling();
+  }, []);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
