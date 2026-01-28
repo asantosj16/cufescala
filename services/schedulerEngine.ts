@@ -18,6 +18,7 @@ const CLAUDIA_RANDOM_OFFS = [
 
 // Gera folgas aleatórias para Cláudia no mês
 // Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
+// Garante que SEMPRE haja as 3 folgas em cada mês
 const generateClaudiaRandomOffs = (year: number, month: number): Record<number, number[]> => {
   // Seed determinístico baseado no mês/ano para consistência
   const seed = year * 12 + month;
@@ -34,6 +35,11 @@ const generateClaudiaRandomOffs = (year: number, month: number): Record<number, 
   
   const weeks = Array.from(weeksInMonth).sort((a, b) => a - b);
   
+  // Se houver menos de 3 semanas, adiciona semanas fictícias para garantir 3 folgas
+  while (weeks.length < 3) {
+    weeks.push(Math.max(...weeks) + 1);
+  }
+  
   // Embaralha as semanas de forma determinística
   const shuffled = [...weeks];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -41,10 +47,10 @@ const generateClaudiaRandomOffs = (year: number, month: number): Record<number, 
     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
   }
   
-  // Aloca os 3 tipos de folga para as primeiras 3 semanas disponíveis
+  // Aloca os 3 tipos de folga para as primeiras 3 semanas
   // Cada semana tem exatamente UM padrão de folga
   const weekOffMap: Record<number, number[]> = {};
-  for (let i = 0; i < Math.min(3, shuffled.length); i++) {
+  for (let i = 0; i < 3; i++) {
     weekOffMap[shuffled[i]] = CLAUDIA_RANDOM_OFFS[i];
   }
   
