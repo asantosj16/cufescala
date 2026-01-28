@@ -27,6 +27,7 @@ const IRENE_RANDOM_OFFS = [
 // Retorna um mapa de semana ISO -> padrão de folga para evitar conflitos
 // Garante que SEMPRE haja as 3 folgas em cada mês (2 dias consecutivos cada)
 // com 4 semanas selecionadas do mês
+// Evita que padrões adjacentes compartilhem dias
 const generateRandomOffs = (year: number, month: number, staffOffsPattern: number[][]): Record<number, number[]> => {
   // Seed determinístico baseado no mês/ano para consistência
   const seed = year * 12 + month;
@@ -44,19 +45,74 @@ const generateRandomOffs = (year: number, month: number, staffOffsPattern: numbe
   // Pega as 4 primeiras semanas reais do mês
   const weeks = Array.from(weeksInMonth).sort((a, b) => a - b).slice(0, 4);
   
-  // Embaralha as 4 semanas selecionadas de forma determinística
-  const shuffled = [...weeks];
-  for (let i = shuffled.length - 1; i > 0; i--) {
+  // Seleciona 3 semanas das 4 (deixando a 4ª sem folga especial)
+  // Embaralha determinísticamente qual será deixada de fora
+  const shuffledWeeks = [...weeks];
+  for (let i = shuffledWeeks.length - 1; i > 0; i--) {
     const j = Math.floor((seed * 9973 + i * 137) % (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    [shuffledWeeks[i], shuffledWeeks[j]] = [shuffledWeeks[j], shuffledWeeks[i]];
   }
   
-  // Aloca os 3 tipos de folga para as 3 primeiras semanas embaralhadas
-  // A 4ª semana não recebe folga especial (segue rotação normal)
-  // Cada semana com folga tem exatamente UM padrão de folga (2 dias consecutivos)
+  const selectedWeeks = shuffledWeeks.slice(0, 3); // Pega as 3 primeiras semanas após embaralhamento
+  
+  // Verifica quais padrões não podem ser adjacentes
+  const conflictingPatterns: Record<number, number[]> = {
+    0: [1], // [5,6] conflita com [6,0]
+    1: [0, 2], // [6,0] conflita com [5,6] e [0,1]
+    2: [1], // [0,1] conflita com [6,0]
+  };
+  
+  // Aloca os padrões para as semanas verificando conflitos
   const weekOffMap: Record<number, number[]> = {};
-  for (let i = 0; i < 3 && i < shuffled.length; i++) {
-    weekOffMap[shuffled[i]] = staffOffsPattern[i];
+  const usedPatterns: number[] = [];
+  
+  for (let i = 0; i < selectedWeeks.length; i++) {
+    const week = selectedWeeks[i];
+    let pattern = i;
+    
+    // Se o padrão atual conflita com o anterior, tenta trocar
+    if (i > 0 && usedPatterns.length > 0) {
+      const prevPattern = usedPatterns[i - 1];
+      if (conflictingPatterns[prevPattern].includes(pattern)) {
+        // Tenta encontrar um padrão que não conflita
+        for (let p = 0; p < staffOffsPattern.length; p++) {
+          if (!usedPatterns.includes(p) && !conflictingPatterns[prevPattern].includes(p)) {
+            pattern = p;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Se ainda está com conflito, permuta com próximas semanas
+    if (i > 0 && usedPatterns.length > 0) {
+      const prevPattern = usedPatterns[i - 1];
+      if (conflictingPatterns[prevPattern].includes(pattern)) {
+        // Tenta permutar com a próxima semana
+        if (i < selectedWeeks.length - 1) {
+          continue; // Deixa para processar depois
+        }
+      }
+    }
+    
+    usedPatterns.push(pattern);
+    weekOffMap[week] = staffOffsPattern[pattern];
+  }
+  
+  // Se houver semanas não processadas, processa-as
+  for (let i = 0; i < selectedWeeks.length; i++) {
+    const week = selectedWeeks[i];
+    if (!weekOffMap[week]) {
+      for (let p = 0; p < staffOffsPattern.length; p++) {
+        if (!usedPatterns.includes(p)) {
+          if (i === 0 || !conflictingPatterns[usedPatterns[i - 1]].includes(p)) {
+            weekOffMap[week] = staffOffsPattern[p];
+            usedPatterns[i] = p;
+            break;
+          }
+        }
+      }
+    }
   }
   
   return weekOffMap;
