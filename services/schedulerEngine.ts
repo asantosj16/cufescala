@@ -9,6 +9,46 @@ const DS_GROUPS = {
   CUSTOM: []
 };
 
+// Folgas aleatórias para Cláudia: (Sexta+Sábado), (Sábado+Domingo), (Domingo+Segunda)
+const CLAUDIA_RANDOM_OFFS = [
+  [5, 6], // Sexta + Sábado
+  [6, 0], // Sábado + Domingo
+  [0, 1], // Domingo + Segunda
+];
+
+// Gera folgas aleatórias para Cláudia no mês
+const generateClaudiaRandomOffs = (year: number, month: number): number[][] => {
+  // Seed determinístico baseado no mês/ano para consistência
+  const seed = year * 12 + month;
+  
+  // Obtém semanas ISO do mês
+  const start = startOfMonth(new Date(year, month));
+  const end = endOfMonth(start);
+  const days = eachDayOfInterval({ start, end });
+  
+  const weeksInMonth = new Set<number>();
+  days.forEach(day => {
+    weeksInMonth.add(getISOWeek(day));
+  });
+  
+  const weeks = Array.from(weeksInMonth).sort((a, b) => a - b);
+  
+  // Embaralha as semanas de forma determinística
+  const shuffled = [...weeks];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor((seed * 9973 + i * 137) % (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  
+  // Aloca os 3 tipos de folga para as primeiras 3 semanas disponíveis
+  const weekOffMap: Record<number, number[]> = {};
+  for (let i = 0; i < Math.min(3, shuffled.length); i++) {
+    weekOffMap[shuffled[i]] = CLAUDIA_RANDOM_OFFS[i];
+  }
+  
+  return Object.values(weekOffMap);
+};
+
 export const generateSchedule = (
   year: number, 
   month: number, 
@@ -22,6 +62,9 @@ export const generateSchedule = (
 
   // Semana de referência fixa (Semana 10 de 2026 como base de rotação conforme pedido original)
   const refWeek = 10;
+  
+  // Gera as folgas aleatórias para Cláudia
+  const claudiaRandomOffs = generateClaudiaRandomOffs(year, month);
 
   days.forEach((day) => {
     const dateStr = format(day, 'yyyy-MM-dd');
@@ -37,7 +80,18 @@ export const generateSchedule = (
         return;
       }
 
-      const offDays = DS_GROUPS[config.offDayGroup] || [];
+      let offDays = DS_GROUPS[config.offDayGroup] || [];
+      
+      // Para Cláudia, aplica folgas aleatórias ao invés da configuração padrão
+      if (staff === 'Cláudia') {
+        offDays = [];
+        claudiaRandomOffs.forEach(offPair => {
+          if (offPair.includes(dayOfWeek)) {
+            offDays.push(dayOfWeek);
+          }
+        });
+      }
+
       const isOffDay = offDays.includes(dayOfWeek);
 
       if (isOffDay) {
